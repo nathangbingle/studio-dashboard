@@ -173,7 +173,9 @@ async function load() {
 
     // Cards
     const bills = data.bills || [];
-    const total = bills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+    const thisYear = new Date().getFullYear();
+    const ytdBills = bills.filter(b => b.date && new Date(b.date).getFullYear() === thisYear);
+    const total = ytdBills.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
     document.getElementById("card-total").textContent = fmt(total);
     document.getElementById("card-share").textContent = fmt(total / 2);
     document.getElementById("card-count").textContent = bills.length;
