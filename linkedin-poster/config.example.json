@@ -1,0 +1,16 @@
+{
+  "linkedin": {
+    "accessToken": "YOUR_LINKEDIN_ACCESS_TOKEN",
+    "personUrn": "YOUR_PERSON_URN"
+  },
+  "business": {
+    "name": "422 Studio",
+    "tagline": "Professional Headshots",
+    "bookingUrl": "",
+    "location": "",
+    "priceRange": ""
+  },
+  "postDefaults": {
+    "hashtags": ["#headshots", "#professionalphotography", "#linkedinheadshot", "#personalbrand", "#headshotphotographer"]
+  }
+}
