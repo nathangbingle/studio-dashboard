@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["cd linkedin-poster && npm install"]
+cmds = ["npm install"]
 
 [start]
-cmd = "cd linkedin-poster && node server.js"
+cmd = "node server.js"
