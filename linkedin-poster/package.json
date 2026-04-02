@@ -4,6 +4,7 @@
   "description": "Automated LinkedIn poster for headshot marketing — drop images, auto-post",
   "type": "module",
   "scripts": {
+    "start": "node server.js",
     "watch": "node watcher.js",
     "post": "node post-single.js",
     "setup": "node setup.js"
