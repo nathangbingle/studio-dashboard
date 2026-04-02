@@ -56,3 +56,4 @@ server.listen(PORT, () => {
   console.log("Schedule: 9am, 12pm, 3pm Eastern");
   console.log("Manual trigger: GET /post");
 });
+
