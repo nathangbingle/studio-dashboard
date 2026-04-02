@@ -147,18 +147,23 @@ export async function waitForJob(apiKey, workspaceId, jobId, maxAttempts = 15) {
 
 /** Full flow: upload image + publish to LinkedIn */
 export async function postToLinkedIn(config, imagePath, postText) {
-  const { apiKey, workspaceId } = config.publer;
+  const { apiKey, workspaceId, linkedInAccountId } = config.publer;
 
-  console.log("  → Finding LinkedIn account...");
-  const account = await getLinkedInAccount(apiKey, workspaceId);
-  console.log(`  → Found: ${account.name} (${account.id})`);
+  // Use cached account ID if available, otherwise fetch it
+  let accountId = linkedInAccountId;
+  if (!accountId) {
+    console.log("  → Finding LinkedIn account...");
+    const account = await getLinkedInAccount(apiKey, workspaceId);
+    console.log(`  → Found: ${account.name} (${account.id})`);
+    accountId = account.id;
+  }
 
   console.log("  → Uploading image...");
   const media = await uploadMedia(apiKey, workspaceId, imagePath);
   console.log(`  → Uploaded (${media.id})`);
 
   console.log("  → Publishing post...");
-  const jobId = await publishPost(apiKey, workspaceId, account.id, postText, media.id);
+  const jobId = await publishPost(apiKey, workspaceId, accountId, postText, media.id);
   console.log(`  → Job submitted (${jobId})`);
 
   if (typeof jobId === "string") {
