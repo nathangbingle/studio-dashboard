@@ -1,12 +1,11 @@
 {
-  "linkedin": {
-    "clientId": "YOUR_CLIENT_ID",
-    "clientSecret": "YOUR_CLIENT_SECRET",
-    "accessToken": "YOUR_LINKEDIN_ACCESS_TOKEN",
-    "personUrn": "YOUR_PERSON_URN"
+  "publer": {
+    "apiKey": "YOUR_PUBLER_API_KEY",
+    "workspaceId": "YOUR_WORKSPACE_ID",
+    "linkedInAccountId": "YOUR_LINKEDIN_ACCOUNT_ID"
   },
   "business": {
-    "name": "422 Studio",
+    "name": "Your Studio Name",
     "tagline": "Professional Headshots",
     "bookingUrl": "",
     "location": "",

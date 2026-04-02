@@ -3,11 +3,12 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import sharp from "sharp";
+import { postToLinkedIn } from "./publer-api.js";
 import { generatePostCopy } from "./copy-generator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, "config.json");
-const READY_FOLDER = path.join(__dirname, "ready");
+const POSTED_FOLDER = path.join(__dirname, "posted");
 const LOG_PATH = path.join(__dirname, "post-log.json");
 
 const imagePath = process.argv[2];
@@ -15,11 +16,6 @@ const postType = process.argv[3] || "auto";
 
 if (!imagePath) {
   console.log("Usage: node post-single.js <image-path> [spotlight|promo|auto]");
-  console.log("");
-  console.log("Examples:");
-  console.log("  node post-single.js drop/headshot.jpg");
-  console.log("  node post-single.js drop/headshot.jpg promo");
-  console.log("  node post-single.js drop/headshot.jpg spotlight");
   process.exit(1);
 }
 
@@ -30,11 +26,11 @@ if (!fs.existsSync(resolved)) {
 }
 
 if (!fs.existsSync(CONFIG_PATH)) {
-  console.error("config.json not found. Copy config.example.json -> config.json and fill in your business info.");
+  console.error("config.json not found.");
   process.exit(1);
 }
 
-if (!fs.existsSync(READY_FOLDER)) fs.mkdirSync(READY_FOLDER, { recursive: true });
+if (!fs.existsSync(POSTED_FOLDER)) fs.mkdirSync(POSTED_FOLDER, { recursive: true });
 
 const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
 const postText = generatePostCopy(
@@ -42,33 +38,37 @@ const postText = generatePostCopy(
   postType
 );
 
-const nameNoExt = path.parse(path.basename(resolved)).name;
-
 // Optimize image
-const optimizedPath = path.join(READY_FOLDER, `${nameNoExt}.jpg`);
+const tmpPath = path.join(POSTED_FOLDER, `_tmp_${path.basename(resolved)}.jpg`);
 await sharp(resolved)
   .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
   .jpeg({ quality: 90 })
-  .toFile(optimizedPath);
+  .toFile(tmpPath);
 
-// Save caption
-const captionPath = path.join(READY_FOLDER, `${nameNoExt}.txt`);
-fs.writeFileSync(captionPath, postText);
+console.log(`\n${postText}\n`);
 
-console.log(`\nImage optimized: ready/${nameNoExt}.jpg`);
-console.log(`Caption saved:   ready/${nameNoExt}.txt`);
-console.log(`\n--- COPY THIS TO LINKEDIN ---\n`);
-console.log(postText);
-console.log(`\n-----------------------------\n`);
+try {
+  const jobId = await postToLinkedIn(config, tmpPath, postText);
 
-// Log
-let log = [];
-if (fs.existsSync(LOG_PATH)) log = JSON.parse(fs.readFileSync(LOG_PATH, "utf-8"));
-log.push({
-  file: path.basename(resolved),
-  type: postType,
-  timestamp: new Date().toISOString(),
-  outputImage: `${nameNoExt}.jpg`,
-  outputCaption: `${nameNoExt}.txt`,
-});
-fs.writeFileSync(LOG_PATH, JSON.stringify(log, null, 2));
+  // Move original to posted, clean up temp
+  const dest = path.join(POSTED_FOLDER, path.basename(resolved));
+  fs.renameSync(resolved, dest);
+  if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+
+  console.log(`Posted and moved to posted/${path.basename(resolved)}`);
+
+  let log = [];
+  if (fs.existsSync(LOG_PATH)) log = JSON.parse(fs.readFileSync(LOG_PATH, "utf-8"));
+  log.push({
+    file: path.basename(resolved),
+    jobId,
+    type: postType,
+    timestamp: new Date().toISOString(),
+    copy: postText,
+  });
+  fs.writeFileSync(LOG_PATH, JSON.stringify(log, null, 2));
+} catch (err) {
+  if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+  console.error(`Failed:`, err.message);
+  process.exit(1);
+}

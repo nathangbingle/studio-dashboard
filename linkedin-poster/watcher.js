@@ -3,27 +3,33 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import sharp from "sharp";
+import { postToLinkedIn } from "./publer-api.js";
 import { generatePostCopy } from "./copy-generator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const CONFIG_PATH = path.join(__dirname, "config.json");
 const DROP_FOLDER = path.join(__dirname, "drop");
-const READY_FOLDER = path.join(__dirname, "ready");
+const POSTED_FOLDER = path.join(__dirname, "posted");
 const LOG_PATH = path.join(__dirname, "post-log.json");
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp"]);
 
 function loadConfig() {
   if (!fs.existsSync(CONFIG_PATH)) {
-    console.error("config.json not found. Copy config.example.json -> config.json and fill in your business info.");
+    console.error("config.json not found.");
     process.exit(1);
   }
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  if (!config.publer?.apiKey || !config.publer?.workspaceId) {
+    console.error("Missing publer.apiKey or publer.workspaceId in config.json");
+    process.exit(1);
+  }
+  return config;
 }
 
 function ensureDirs() {
-  for (const dir of [DROP_FOLDER, READY_FOLDER]) {
+  for (const dir of [DROP_FOLDER, POSTED_FOLDER]) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -50,10 +56,17 @@ async function optimizeImage(inputPath, outputPath) {
     .toFile(outputPath);
 }
 
-async function handleNewImage(filePath) {
+// Queue to process one image at a time
+const queue = [];
+let processing = false;
+
+async function processQueue() {
+  if (processing || queue.length === 0) return;
+  processing = true;
+
+  const filePath = queue.shift();
   const filename = path.basename(filePath);
-  const nameNoExt = path.parse(filename).name;
-  console.log(`\n--- New image: ${filename} ---`);
+  console.log(`\n--- Processing: ${filename} ---`);
 
   // Detect post type from filename
   let type = "auto";
@@ -71,33 +84,40 @@ async function handleNewImage(filePath) {
       type
     );
 
-    // Optimize image for LinkedIn
-    const optimizedPath = path.join(READY_FOLDER, `${nameNoExt}.jpg`);
-    await optimizeImage(filePath, optimizedPath);
+    // Optimize image to temp file
+    const tmpPath = path.join(POSTED_FOLDER, `_tmp_${filename}.jpg`);
+    await optimizeImage(filePath, tmpPath);
 
-    // Save caption as text file
-    const captionPath = path.join(READY_FOLDER, `${nameNoExt}.txt`);
-    fs.writeFileSync(captionPath, postText);
+    console.log(`\n${postText}\n`);
 
-    // Remove original from drop folder
-    fs.unlinkSync(filePath);
+    // Post via Publer
+    const jobId = await postToLinkedIn(config, tmpPath, postText);
 
-    console.log(`\nImage optimized: ready/${nameNoExt}.jpg`);
-    console.log(`Caption saved:   ready/${nameNoExt}.txt`);
-    console.log(`\n--- COPY THIS TO LINKEDIN ---\n`);
-    console.log(postText);
-    console.log(`\n-----------------------------\n`);
+    // Clean up: move original to posted, remove temp
+    const dest = path.join(POSTED_FOLDER, filename);
+    fs.renameSync(filePath, dest);
+    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+
+    console.log(`Done! Moved to posted/${filename}\n`);
 
     appendLog({
       file: filename,
       type,
+      jobId,
       timestamp: new Date().toISOString(),
-      outputImage: `${nameNoExt}.jpg`,
-      outputCaption: `${nameNoExt}.txt`,
+      copy: postText,
     });
   } catch (err) {
-    console.error(`Failed to process ${filename}:`, err.message);
+    console.error(`Failed to post ${filename}:`, err.message);
+    appendLog({
+      file: filename,
+      error: err.message,
+      timestamp: new Date().toISOString(),
+    });
   }
+
+  processing = false;
+  processQueue(); // process next in queue
 }
 
 // --- Main ---
@@ -105,17 +125,15 @@ ensureDirs();
 loadConfig();
 
 console.log(`
-LinkedIn Headshot Poster
-========================
+LinkedIn Headshot Poster (via Publer)
+======================================
 Drop folder:  ${DROP_FOLDER}
-Output folder: ${READY_FOLDER}
+Posted moved:  ${POSTED_FOLDER}
 
-Drop a .jpg/.jpeg/.png/.webp into drop/ and I'll:
-  1. Optimize the image for LinkedIn (1200px, high quality)
-  2. Generate marketing caption
-  3. Save both to ready/ folder
+Drop .jpg/.jpeg/.png/.webp images into drop/
+They auto-post to LinkedIn via Publer.
 
-Tip: include 'promo' or 'client' in the filename to control post style.
+Tip: include 'promo' or 'client' in filename to control post style.
 Press Ctrl+C to stop.
 `);
 
@@ -129,7 +147,8 @@ const watcher = watch(DROP_FOLDER, {
 
 watcher.on("add", (filePath) => {
   if (isImage(filePath)) {
-    handleNewImage(filePath);
+    queue.push(filePath);
+    processQueue();
   }
 });
 
