@@ -88,7 +88,7 @@ I have a few spots open this month for professional headshot sessions.
 
 ${biz.priceRange ? `${biz.priceRange} · ` : ""}Quick session · Big upgrade.
 
-${biz.bookingUrl ? `${biz.bookingUrl}` : "Comment "HEADSHOT" and I'll send you the details."}
+${biz.bookingUrl ? `${biz.bookingUrl}` : 'Comment "HEADSHOT" and I\'ll send you the details.'}
 
 ${formatHashtags(biz)}`,
 

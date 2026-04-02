@@ -2,12 +2,12 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { postHeadshotToLinkedIn } from "./linkedin-api.js";
+import sharp from "sharp";
 import { generatePostCopy } from "./copy-generator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, "config.json");
-const POSTED_FOLDER = path.join(__dirname, "posted");
+const READY_FOLDER = path.join(__dirname, "ready");
 const LOG_PATH = path.join(__dirname, "post-log.json");
 
 const imagePath = process.argv[2];
@@ -25,46 +25,50 @@ if (!imagePath) {
 
 const resolved = path.resolve(imagePath);
 if (!fs.existsSync(resolved)) {
-  console.error(`❌ File not found: ${resolved}`);
+  console.error(`File not found: ${resolved}`);
   process.exit(1);
 }
 
 if (!fs.existsSync(CONFIG_PATH)) {
-  console.error("❌ config.json not found. Copy config.example.json → config.json and fill in your credentials.");
+  console.error("config.json not found. Copy config.example.json -> config.json and fill in your business info.");
   process.exit(1);
 }
 
-const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+if (!fs.existsSync(READY_FOLDER)) fs.mkdirSync(READY_FOLDER, { recursive: true });
 
+const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
 const postText = generatePostCopy(
   { ...config.business, hashtags: config.postDefaults?.hashtags },
   postType
 );
 
-console.log(`📝 Post copy (${postType}):\n`);
+const nameNoExt = path.parse(path.basename(resolved)).name;
+
+// Optimize image
+const optimizedPath = path.join(READY_FOLDER, `${nameNoExt}.jpg`);
+await sharp(resolved)
+  .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+  .jpeg({ quality: 90 })
+  .toFile(optimizedPath);
+
+// Save caption
+const captionPath = path.join(READY_FOLDER, `${nameNoExt}.txt`);
+fs.writeFileSync(captionPath, postText);
+
+console.log(`\nImage optimized: ready/${nameNoExt}.jpg`);
+console.log(`Caption saved:   ready/${nameNoExt}.txt`);
+console.log(`\n--- COPY THIS TO LINKEDIN ---\n`);
 console.log(postText);
-console.log("\n---\n");
+console.log(`\n-----------------------------\n`);
 
-try {
-  const postId = await postHeadshotToLinkedIn(config, resolved, postText);
-
-  if (!fs.existsSync(POSTED_FOLDER)) fs.mkdirSync(POSTED_FOLDER, { recursive: true });
-  const dest = path.join(POSTED_FOLDER, path.basename(resolved));
-  fs.renameSync(resolved, dest);
-  console.log(`✅ Posted and moved to posted/${path.basename(resolved)}`);
-
-  // Log
-  let log = [];
-  if (fs.existsSync(LOG_PATH)) log = JSON.parse(fs.readFileSync(LOG_PATH, "utf-8"));
-  log.push({
-    file: path.basename(resolved),
-    postId,
-    type: postType,
-    timestamp: new Date().toISOString(),
-    copy: postText,
-  });
-  fs.writeFileSync(LOG_PATH, JSON.stringify(log, null, 2));
-} catch (err) {
-  console.error(`❌ Failed:`, err.message);
-  process.exit(1);
-}
+// Log
+let log = [];
+if (fs.existsSync(LOG_PATH)) log = JSON.parse(fs.readFileSync(LOG_PATH, "utf-8"));
+log.push({
+  file: path.basename(resolved),
+  type: postType,
+  timestamp: new Date().toISOString(),
+  outputImage: `${nameNoExt}.jpg`,
+  outputCaption: `${nameNoExt}.txt`,
+});
+fs.writeFileSync(LOG_PATH, JSON.stringify(log, null, 2));
