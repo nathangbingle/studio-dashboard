@@ -1,5 +1,7 @@
 {
   "linkedin": {
+    "clientId": "YOUR_CLIENT_ID",
+    "clientSecret": "YOUR_CLIENT_SECRET",
     "accessToken": "YOUR_LINKEDIN_ACCESS_TOKEN",
     "personUrn": "YOUR_PERSON_URN"
   },

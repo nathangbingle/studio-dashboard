@@ -6,7 +6,8 @@
   "scripts": {
     "watch": "node watcher.js",
     "post": "node post-single.js",
-    "setup": "node setup.js"
+    "setup": "node setup.js",
+    "auth": "node auth.js"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
