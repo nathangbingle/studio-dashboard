@@ -1,0 +1,13 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "watchPatterns": ["linkedin-poster/**"],
+    "buildCommand": "cd linkedin-poster && npm install"
+  },
+  "deploy": {
+    "startCommand": "cd linkedin-poster && node server.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
