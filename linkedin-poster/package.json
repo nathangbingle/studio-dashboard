@@ -1,16 +1,12 @@
 {
   "name": "linkedin-headshot-poster",
   "version": "1.0.0",
-  "description": "Automated LinkedIn poster for headshot marketing — drop images, auto-post",
+  "description": "Scheduled LinkedIn headshot poster — pulls from Google Drive, posts via Publer 3x/day",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "watch": "node watcher.js",
-    "post": "node post-single.js",
-    "setup": "node setup.js"
+    "start": "node server.js"
   },
   "dependencies": {
-    "chokidar": "^4.0.3",
-    "sharp": "^0.33.5"
+    "node-cron": "^3.0.3"
   }
 }

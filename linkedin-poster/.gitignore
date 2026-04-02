@@ -1,5 +1,8 @@
 node_modules/
 config.json
+posted-ids.json
+tmp/
 drop/
 posted/
+ready/
 post-log.json

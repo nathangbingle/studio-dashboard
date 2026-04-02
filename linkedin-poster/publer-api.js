@@ -1,5 +1,6 @@
-import fs from "fs";
-import path from "path";
+/**
+ * Publer API client for posting to LinkedIn.
+ */
 
 const API_BASE = "https://app.publer.com/api/v1";
 
@@ -11,67 +12,17 @@ function headers(apiKey, workspaceId) {
   };
 }
 
-/** List all connected accounts and return the LinkedIn one */
-export async function getLinkedInAccount(apiKey, workspaceId) {
-  const res = await fetch(`${API_BASE}/accounts`, {
-    headers: headers(apiKey, workspaceId),
-  });
+/**
+ * Upload an image buffer to Publer.
+ * Returns { id, path, thumbnail }
+ */
+export async function uploadMedia(apiKey, workspaceId, imageBuffer, filename) {
+  const boundary = `----Upload${Date.now()}`;
+  const mime = filename.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Failed to list accounts (${res.status}): ${body}`);
-  }
-
-  const accounts = await res.json();
-  const linkedin = accounts.find((a) => a.provider === "linkedin");
-
-  if (!linkedin) {
-    throw new Error("No LinkedIn account found in Publer. Connect one at app.publer.com");
-  }
-
-  return linkedin;
-}
-
-/** List all workspaces (no workspace ID header needed) */
-export async function getWorkspaces(apiKey) {
-  const res = await fetch(`${API_BASE}/workspaces`, {
-    headers: {
-      "Authorization": `Bearer-API ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Failed to list workspaces (${res.status}): ${body}`);
-  }
-
-  return res.json();
-}
-
-/** Upload an image to Publer media library */
-export async function uploadMedia(apiKey, workspaceId, imagePath) {
-  const imageBuffer = fs.readFileSync(imagePath);
-  const filename = path.basename(imagePath);
-  const ext = path.extname(imagePath).toLowerCase();
-
-  const mimeTypes = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-  };
-
-  const boundary = `----PublerUpload${Date.now()}`;
-  const mime = mimeTypes[ext] || "image/jpeg";
-
-  const bodyParts = [
-    `--${boundary}\r\n`,
-    `Content-Disposition: form-data; name="file"; filename="${filename}"\r\n`,
-    `Content-Type: ${mime}\r\n\r\n`,
-  ];
-
-  const header = Buffer.from(bodyParts.join(""));
+  const header = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`
+  );
   const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
   const body = Buffer.concat([header, imageBuffer, footer]);
 
@@ -87,13 +38,15 @@ export async function uploadMedia(apiKey, workspaceId, imagePath) {
 
   if (!res.ok) {
     const errBody = await res.text();
-    throw new Error(`Failed to upload media (${res.status}): ${errBody}`);
+    throw new Error(`Publer upload failed (${res.status}): ${errBody}`);
   }
 
   return res.json();
 }
 
-/** Publish a LinkedIn post with image immediately */
+/**
+ * Publish a LinkedIn post with image immediately.
+ */
 export async function publishPost(apiKey, workspaceId, accountId, text, mediaId) {
   const res = await fetch(`${API_BASE}/posts/schedule/publish`, {
     method: "POST",
@@ -101,76 +54,41 @@ export async function publishPost(apiKey, workspaceId, accountId, text, mediaId)
     body: JSON.stringify({
       bulk: {
         state: "scheduled",
-        posts: [
-          {
-            networks: {
-              linkedin: {
-                type: "photo",
-                text,
-                media: [{ id: mediaId, type: "photo" }],
-              },
+        posts: [{
+          networks: {
+            linkedin: {
+              type: "photo",
+              text,
+              media: [{ id: mediaId, type: "photo" }],
             },
-            accounts: [{ id: accountId }],
           },
-        ],
+          accounts: [{ id: accountId }],
+        }],
       },
     }),
   });
 
   if (!res.ok) {
     const errBody = await res.text();
-    throw new Error(`Failed to publish post (${res.status}): ${errBody}`);
+    throw new Error(`Publer publish failed (${res.status}): ${errBody}`);
   }
 
-  const data = await res.json();
-  return data.job_id || data;
+  return res.json();
 }
 
-/** Poll job status until complete */
+/**
+ * Poll job status until complete.
+ */
 export async function waitForJob(apiKey, workspaceId, jobId, maxAttempts = 15) {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, 2000));
-
     const res = await fetch(`${API_BASE}/job_status/${jobId}`, {
       headers: headers(apiKey, workspaceId),
     });
-
     if (!res.ok) continue;
-
     const data = await res.json();
     if (data.status === "complete") return data;
-    if (data.status === "failed") throw new Error(`Job failed: ${JSON.stringify(data)}`);
+    if (data.status === "failed") throw new Error(`Publer job failed: ${JSON.stringify(data)}`);
   }
-
-  throw new Error("Job timed out after polling");
-}
-
-/** Full flow: upload image + publish to LinkedIn */
-export async function postToLinkedIn(config, imagePath, postText) {
-  const { apiKey, workspaceId, linkedInAccountId } = config.publer;
-
-  // Use cached account ID if available, otherwise fetch it
-  let accountId = linkedInAccountId;
-  if (!accountId) {
-    console.log("  → Finding LinkedIn account...");
-    const account = await getLinkedInAccount(apiKey, workspaceId);
-    console.log(`  → Found: ${account.name} (${account.id})`);
-    accountId = account.id;
-  }
-
-  console.log("  → Uploading image...");
-  const media = await uploadMedia(apiKey, workspaceId, imagePath);
-  console.log(`  → Uploaded (${media.id})`);
-
-  console.log("  → Publishing post...");
-  const jobId = await publishPost(apiKey, workspaceId, accountId, postText, media.id);
-  console.log(`  → Job submitted (${jobId})`);
-
-  if (typeof jobId === "string") {
-    console.log("  → Waiting for publish...");
-    await waitForJob(apiKey, workspaceId, jobId);
-  }
-
-  console.log("  → Posted to LinkedIn!");
-  return jobId;
+  throw new Error("Publer job timed out");
 }
