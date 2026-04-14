@@ -1,0 +1,16 @@
+{
+  "name": "studio-dashboard-blog-poster",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Weekly autonomous blog poster for the studio Squarespace site.",
+  "main": "generate-and-send.mjs",
+  "scripts": {
+    "post": "node generate-and-send.mjs",
+    "dry-run": "DRY_RUN=true node generate-and-send.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "nodemailer": "^6.9.16"
+  }
+}

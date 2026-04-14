@@ -1,0 +1,58 @@
+name: Weekly Blog Post
+
+on:
+  schedule:
+    # Every Monday at 13:00 UTC (~9am ET / 6am PT)
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Generate and archive the post but do NOT email it"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: blog
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate and send weekly post
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SQUARESPACE_BLOG_EMAIL: ${{ secrets.SQUARESPACE_BLOG_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: node generate-and-send.mjs
+
+      - name: Commit archived post
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain blog/posts)" ]; then
+            git add blog/posts
+            git commit -m "chore(blog): archive weekly post $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "No new post archived (likely no upcoming events)."
+          fi
+        working-directory: ${{ github.workspace }}

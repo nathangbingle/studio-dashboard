@@ -1,0 +1,36 @@
+{
+  "$schema": "./schedule.schema.json",
+  "description": "Upcoming school and sports media days / picture days. The weekly blog poster reads this file to write a post about whatever is coming up in the next 14 days. Add new entries as you schedule them; remove or keep old ones -- events with dates in the past are ignored automatically.",
+  "events": [
+    {
+      "id": "example-1",
+      "date": "2026-04-22",
+      "type": "picture-day",
+      "school": "Lincoln High School",
+      "audience": "9th-12th grade",
+      "location": "Main Gym",
+      "time": "8:00 AM - 2:00 PM",
+      "notes": "Retake day scheduled for May 6. Students should wear school-appropriate attire. Order forms due by April 20."
+    },
+    {
+      "id": "example-2",
+      "date": "2026-04-26",
+      "type": "sports-media-day",
+      "school": "Lincoln High School",
+      "audience": "Varsity Football",
+      "location": "Stadium Field",
+      "time": "10:00 AM - 1:00 PM",
+      "notes": "Team and individual portraits. Players should arrive in full game uniform. Coaches photographed at 12:30."
+    },
+    {
+      "id": "example-3",
+      "date": "2026-05-03",
+      "type": "sports-media-day",
+      "school": "Roosevelt Middle School",
+      "audience": "Spring sports (baseball, softball, track)",
+      "location": "Baseball Field",
+      "time": "9:00 AM - 12:00 PM",
+      "notes": "Rain date: May 10. Bring alternate jersey for secondary shots."
+    }
+  ]
+}
